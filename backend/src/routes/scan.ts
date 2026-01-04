@@ -1,68 +1,34 @@
 import { Router } from 'express';
 import { scanWallet } from '../services/detector';
-import { resolveENS } from '../services/alchemy';
-import { generateReport } from '../services/ai';
-import { APIResponse, MEVScanResult } from '../types';
 
 const router = Router();
 
-// GET /api/scan/:address
-router.get('/:address', async (req, res) => {
-  const { address } = req.params;
-  const network = (req.query.network as 'ethereum' | 'base') || 'ethereum';
-  const limit = parseInt(req.query.limit as string) || 20;
+// GET /api/scan/:addressOrENS
+router.get('/:addressOrENS', async (req, res) => {
+  const { addressOrENS } = req.params;
+  const limit = Math.min(parseInt(req.query.limit as string) || 30, 50);
 
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    return res.status(400).json({ success: false, error: 'Invalid address' });
-  }
+  console.log(`[API] Scan request: ${addressOrENS}, limit=${limit}`);
 
-  try {
-    const result = await scanWallet(address, network, limit);
-    
-    // Generate AI report if attacks found
-    let aiReport: string | undefined;
-    if (result.attackedTransactions > 0) {
-      try {
-        aiReport = await generateReport(result);
-      } catch {
-        // AI report is optional
-      }
-    }
+  // Basic validation
+  const isENS = addressOrENS.toLowerCase().endsWith('.eth');
+  const isAddress = /^0x[a-fA-F0-9]{40}$/i.test(addressOrENS);
 
-    const response: APIResponse<MEVScanResult & { aiReport?: string }> = {
-      success: true,
-      data: { ...result, aiReport },
-    };
-    res.json(response);
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Scan failed' 
+  if (!isENS && !isAddress) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid input. Please enter a valid Ethereum address (0x...) or ENS name (*.eth)',
     });
   }
-});
-
-// GET /api/scan/ens/:name
-router.get('/ens/:name', async (req, res) => {
-  const { name } = req.params;
-  const network = (req.query.network as 'ethereum' | 'base') || 'ethereum';
 
   try {
-    const address = await resolveENS(name);
-    if (!address) {
-      return res.status(404).json({ success: false, error: 'ENS not found' });
-    }
-
-    const result = await scanWallet(address, network, 20);
-    const response: APIResponse<MEVScanResult> = {
-      success: true,
-      data: { ...result, ensName: name },
-    };
-    res.json(response);
+    const result = await scanWallet(addressOrENS, limit);
+    res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Scan failed' 
+    console.error('[API] Scan error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Scan failed',
     });
   }
 });

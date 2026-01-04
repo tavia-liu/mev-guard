@@ -1,43 +1,50 @@
+export interface SwapTransaction {
+  hash: string;
+  blockNumber: number;
+  timestamp: string;
+  from: string;
+  to: string;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  amountOut: string;
+}
+
 export interface SandwichAttack {
   victimTxHash: string;
   frontrunTxHash: string;
   backrunTxHash: string;
   attackerAddress: string;
   victimLossUSD: string;
-  attackerProfitUSD: string;
   blockNumber: number;
   timestamp: number;
+  tokenPair: string;
 }
 
-export interface MEVScanResult {
+export interface ScanResult {
   walletAddress: string;
   ensName?: string;
   totalTransactions: number;
   attackedTransactions: number;
   totalLossUSD: string;
   attacks: SandwichAttack[];
-  scanTimestamp: number;
+  aiReport?: string;
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
-export interface TransactionAnalysis {
-  txHash: string;
-  blockNumber: number;
-  isMEVAttack: boolean;
-  attackType: 'sandwich' | 'frontrun' | 'backrun' | 'none';
-  attack?: SandwichAttack;
-  aiExplanation?: string;
-  recommendations?: string[];
-}
+// Uniswap V2/V3 Swap event signatures
+export const SWAP_SIGNATURES = {
+  // Uniswap V2 Swap(address,uint256,uint256,uint256,uint256,address)
+  UNISWAP_V2: '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822',
+  // Uniswap V3 Swap(address,address,int256,int256,uint160,uint128,int24)
+  UNISWAP_V3: '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67',
+};
 
-export interface APIResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-export const DEX_ROUTERS: Record<string, string> = {
-  UNISWAP_V2: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
-  UNISWAP_V3: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
-  UNISWAP_UNIVERSAL: '0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD',
-  SUSHISWAP: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
+// Known token addresses for labeling
+export const TOKENS: Record<string, string> = {
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': 'WETH',
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'USDC',
+  '0xdac17f958d2ee523a2206206994597c13d831ec7': 'USDT',
+  '0x6b175474e89094c44da98b954eedeac495271d0f': 'DAI',
+  '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599': 'WBTC',
 };

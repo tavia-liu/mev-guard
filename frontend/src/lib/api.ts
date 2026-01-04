@@ -1,5 +1,3 @@
-const API_BASE = '/api';
-
 export interface SandwichAttack {
   victimTxHash: string;
   frontrunTxHash: string;
@@ -7,6 +5,8 @@ export interface SandwichAttack {
   attackerAddress: string;
   victimLossUSD: string;
   blockNumber: number;
+  timestamp: number;
+  tokenPair: string;
 }
 
 export interface ScanResult {
@@ -17,35 +17,17 @@ export interface ScanResult {
   totalLossUSD: string;
   attacks: SandwichAttack[];
   aiReport?: string;
+  riskLevel: 'low' | 'medium' | 'high';
 }
 
-export interface TransactionAnalysis {
-  txHash: string;
-  blockNumber: number;
-  isMEVAttack: boolean;
-  attackType: string;
-  attack?: SandwichAttack;
-  aiExplanation?: string;
-  recommendations?: string[];
-}
-
-export async function scanWallet(address: string, network = 'ethereum'): Promise<ScanResult> {
-  const res = await fetch(`${API_BASE}/scan/${address}?network=${network}`);
+export async function scanWallet(addressOrENS: string): Promise<ScanResult> {
+  const url = `/api/scan/${encodeURIComponent(addressOrENS)}?limit=30`;
+  const res = await fetch(url);
   const json = await res.json();
-  if (!json.success) throw new Error(json.error);
-  return json.data;
-}
-
-export async function scanENS(name: string): Promise<ScanResult> {
-  const res = await fetch(`${API_BASE}/scan/ens/${name}`);
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error);
-  return json.data;
-}
-
-export async function analyzeTransaction(hash: string, network = 'ethereum'): Promise<TransactionAnalysis> {
-  const res = await fetch(`${API_BASE}/transaction/${hash}?network=${network}`);
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error);
+  
+  if (!json.success) {
+    throw new Error(json.error || 'Scan failed');
+  }
+  
   return json.data;
 }

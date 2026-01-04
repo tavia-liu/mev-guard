@@ -3,9 +3,5 @@ dist/
 build/
 .env
 .env.local
-**/.env
 *.log
 .DS_Store
-.cache
-coverage/
-

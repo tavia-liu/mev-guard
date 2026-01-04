@@ -1,86 +1,42 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+let client: Anthropic | null = null;
 
-interface AttackContext {
-  victimTxHash: string;
-  blockNumber: number;
-  victimAddress: string;
-  frontrunHash?: string;
-  backrunHash?: string;
-  attackerAddress?: string;
+function getClient(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!client) {
+    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return client;
 }
 
-export async function analyzeAttack(context: AttackContext): Promise<{
-  explanation: string;
-  recommendations: string[];
-}> {
-  const prompt = `You are an MEV (Maximal Extractable Value) expert. Analyze this potential sandwich attack and explain it simply.
-
-Transaction Details:
-- Victim Transaction: ${context.victimTxHash}
-- Block Number: ${context.blockNumber}
-- Victim Address: ${context.victimAddress}
-${context.frontrunHash ? `- Frontrun Transaction: ${context.frontrunHash}` : ''}
-${context.backrunHash ? `- Backrun Transaction: ${context.backrunHash}` : ''}
-${context.attackerAddress ? `- Attacker Address: ${context.attackerAddress}` : ''}
-
-Respond in JSON format:
-{
-  "explanation": "2-3 sentence explanation of what happened in plain English",
-  "recommendations": ["3-4 actionable tips to avoid this in the future"]
-}`;
-
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250514',
-    max_tokens: 500,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    return {
-      explanation: 'Unable to analyze this transaction.',
-      recommendations: ['Use MEV protection services like MEV Blocker'],
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(content.text);
-    return {
-      explanation: parsed.explanation,
-      recommendations: parsed.recommendations,
-    };
-  } catch {
-    return {
-      explanation: content.text,
-      recommendations: ['Use MEV protection services like MEV Blocker'],
-    };
-  }
-}
-
-export async function generateReport(scanResult: {
-  walletAddress: string;
+export async function generateReport(data: {
   totalTransactions: number;
   attackedTransactions: number;
   totalLossUSD: string;
 }): Promise<string> {
-  const prompt = `Generate a brief MEV exposure report for this wallet:
-- Address: ${scanResult.walletAddress}
-- Total swap transactions: ${scanResult.totalTransactions}
-- Transactions affected by MEV: ${scanResult.attackedTransactions}
-- Estimated total loss: $${scanResult.totalLossUSD}
+  const attackRate = data.totalTransactions > 0 
+    ? ((data.attackedTransactions / data.totalTransactions) * 100).toFixed(1)
+    : '0';
 
-Write 2-3 sentences summarizing the findings and risk level.`;
+  const defaultReport = `This wallet has ${data.attackedTransactions} detected MEV attacks across ${data.totalTransactions} DEX swap transactions (${attackRate}% attack rate). Estimated loss: $${data.totalLossUSD}. Consider using MEV protection services like MEV Blocker or Flashbots Protect.`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250514',
-    max_tokens: 200,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const anthropic = getClient();
+  if (!anthropic) return defaultReport;
 
-  const content = response.content[0];
-  return content.type === 'text' ? content.text : 'Unable to generate report.';
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250514',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `Write a 2-sentence MEV exposure summary for a wallet with ${data.totalTransactions} swap transactions, ${data.attackedTransactions} MEV attacks (${attackRate}% rate), and $${data.totalLossUSD} estimated loss. Be specific and actionable.`
+      }],
+    });
+
+    const content = response.content[0];
+    return content.type === 'text' ? content.text : defaultReport;
+  } catch {
+    return defaultReport;
+  }
 }
