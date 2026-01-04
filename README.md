@@ -7,7 +7,6 @@ AI-powered MEV attack detector and loss tracker for Ethereum wallets.
 ```bash
 # Backend
 cd backend
-cp .env.example .env  # Add ALCHEMY_API_KEY
 npm install
 npm run dev
 
